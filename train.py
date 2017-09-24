@@ -6,8 +6,11 @@ from models import ChainedAutoencoder
 USE_CUDA = torch.cuda.is_available()
 TRAIN_LOADER = torch.utils.data.DataLoader(
         datasets.CIFAR10('./data', train=True, download=True,
-                        transform=transforms.ToTensor()))
+                        transform=transforms.ToTensor()),
+        shuffle=True)
 PRINT_EVERY = 50
+LEARNING_RATE_UPDATE_TIME = 2000
+CHAIN_LENGTH_INCREMENT_TIME = 5000
 
 def setup(learning_rate=1e-3):
     model = ChainedAutoencoder()
@@ -24,22 +27,34 @@ def setup(learning_rate=1e-3):
 def get_optimizer(model, learning_rate=1e-3):
     return torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-def train_example(model, image_tensor, optimizer, criterion, num_chains=1):
+def lr_schedule(initial_lr=1e-3, decay_rate=0.5):
+    lr = initial_lr / decay_rate
+    while True:
+        yield lr * decay_rate
+
+def train_example(model, image_tensor, optimizer, criterion,
+        num_chains=1, backprop=True):
     image_variable = Variable(image_tensor, requires_grad=False)
     if USE_CUDA:
         image_variable = image_variable.cuda()
+
     image_output = model(image_variable, num_chains=num_chains)
     loss = criterion(image_output, image_variable)
-    loss.backward()
-    optimizer.step()
-    optimizer.zero_grad()
+
+    if backprop:
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
     return loss
 
 if __name__ == '__main__':
-    unchained_model, unchained_optimizer, criterion = setup()
+    leanring_rate_schedule = lr_schedule()
+    learning_rate = leanring_rate_schedule.__next__()
+
+    unchained_model, unchained_optimizer, criterion = setup(learning_rate=learning_rate)
     unchained_losses = []
 
-    chained_model, chained_optimizer, _ = setup()
+    chained_model, chained_optimizer, _ = setup(learning_rate=learning_rate)
     chained_losses = []
 
     print("Starting Training")
@@ -47,11 +62,18 @@ if __name__ == '__main__':
         unchained_losses.append(train_example(
             unchained_model, image_tensor, unchained_optimizer, criterion).data[0])
 
-        num_chains = (iter_id // 10000) + 1
+        num_chains = (iter_id // CHAIN_LENGTH_INCREMENT_TIME) + 1
         chained_losses.append(train_example(
             chained_model, image_tensor, chained_optimizer,
             criterion, num_chains=num_chains).data[0])
-
+        
+        if (iter_id + 1) % LEARNING_RATE_UPDATE_TIME == 0:
+            new_learning_rate = leanring_rate_schedule.__next__()
+            unchained_optimizer = get_optimizer(model=unchained_model,
+                    learning_rate=new_learning_rate)
+            chained_optimizer = get_optimizer(model=chained_model,
+                    learning_rate=new_learning_rate)
+            print("Learning rate updated to {}\n".format(new_learning_rate))
 
         if (iter_id + 1) % PRINT_EVERY == 0:
             print("Current average unchained loss is {}".format(
