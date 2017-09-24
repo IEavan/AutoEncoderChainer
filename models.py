@@ -25,6 +25,7 @@ class ChainedAutoencoder(torch.nn.Module):
 
         return flat_tensor.view(batch_size,3,32,32)
 
-model = ChainedAutoencoder()
-x = torch.FloatTensor(1,3,32,32)
-y = model(Variable(x), 1)
+if __name__ == '__main__':
+    model = ChainedAutoencoder()
+    x = torch.FloatTensor(1,3,32,32)
+    y = model(Variable(x), 1)
