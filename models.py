@@ -11,8 +11,8 @@ class ChainedAutoencoder(torch.nn.Module):
         # Encoder structure will be fully connected
         # Dimensions are 3072 --> 1000 --> 100 --> 10 and vice versa for decoder
         dims = [3072, 1000, 100, 10, 100, 1000, 3072]
-        self.linear_transforms = [torch.nn.Linear(dims[i], dims[i+1])
-                            for i in range(len(dims) - 1)]
+        self.linear_transforms = torch.nn.ModuleList([torch.nn.Linear(dims[i], dims[i+1])
+                            for i in range(len(dims) - 1)])
 
     def forward(self, image_tensor, num_chains=1):
         batch_size = len(image_tensor)
