@@ -14,6 +14,7 @@ TEST_LOADER = torch.utils.data.DataLoader(
         shuffle=True)
 PRINT_EVERY = 50
 LEANRING_RATE_DECAY_TIME = 2000
+DECAY = 0.8
 CHAIN_LENGTH_INCREMENT_TIME = 5000
 
 def setup(learning_rate=1e-3):
@@ -31,10 +32,11 @@ def setup(learning_rate=1e-3):
 def get_optimizer(model, learning_rate=1e-3):
     return torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-def lr_schedule(initial_lr=1e-3, decay_rate=0.5):
+def lr_schedule(initial_lr=1e-3, decay_rate=DECAY):
     lr = initial_lr / decay_rate
     while True:
-        yield lr * decay_rate
+        lr *= decay_rate
+        yield lr
 
 def train_example(model, image_tensor, criterion, optimizer=None,
         num_chains=1, backprop=True):
